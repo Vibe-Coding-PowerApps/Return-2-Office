@@ -1,0 +1,22 @@
+{
+  "appId": "",
+  "appDisplayName": "Return 2 Office",
+  "description": null,
+  "environmentId": "e18eb7f0-88aa-ef83-961e-673a0b373c0b",
+  "buildPath": "./dist",
+  "buildEntryPoint": "index.html",
+  "logoPath": "Default",
+  "localAppUrl": "http://localhost:5176/",
+  "region": "prod",
+  "connectionReferences": {
+    "f128385b-3d29-43ce-8ed8-5483ea712711": {
+      "id": "/providers/Microsoft.PowerApps/apis/shared_commondataserviceforapps",
+      "displayName": "Microsoft Dataverse",
+      "dataSources": [
+        "commondataserviceforapps"
+      ],
+      "dataSets": {}
+    }
+  },
+  "databaseReferences": {}
+}
