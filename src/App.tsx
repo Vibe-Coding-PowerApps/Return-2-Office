@@ -13,19 +13,9 @@ import DashboardPage from './app/dashboard/page'
 import WorkplaceUtilizationPage from './app/workplace-utilization/page'
 import ResourceLibraryPage from './app/resources/library/page'
 import SchedulesPage from './app/schedules/page'
+import TeamPage from './app/team/page'
 
 // Placeholder pages for other routes
-
-function TeamPage() {
-  return (
-    <div className="flex items-center justify-center min-h-screen">
-      <div className="text-center">
-        <h1 className="text-3xl font-bold mb-4">Team</h1>
-        <p className="text-muted-foreground">Coming soon</p>
-      </div>
-    </div>
-  )
-}
 
 function AppContent({ userData }: { userData: any }) {
   return (
