@@ -1,13 +1,15 @@
 'use client'
 
 import { useState } from 'react'
-import { Card, CardContent } from '@/ui/card'
+import { Card, CardContent, CardDescription, CardHeader, CardTitle, CardAction, CardFooter } from '@/ui/card'
 import { Button } from '@/ui/button'
 import { Input } from '@/ui/input'
 import { Sheet, SheetContent, SheetDescription, SheetHeader, SheetTitle, SheetTrigger } from '@/ui/sheet'
 import { Separator } from '@/ui/separator'
-import { IconUpload, IconPlus, IconFile, IconDownload } from '@tabler/icons-react'
-import { DataTableTeams } from '@/components/data-table-teams'
+import { IconUpload, IconPlus, IconFile, IconDownload, IconTrendingUp } from '@tabler/icons-react'
+import { Badge } from '@/ui/badge'
+import { toast } from 'sonner'
+import { DataTableMembers } from '@/components/data-table-members'
 
 type TeamMember = {
   id: string
@@ -25,23 +27,36 @@ type Team = {
   totalMembers: number
   officeToday: number
   officeThisWeek: number
-  members: TeamMember[]
+  members?: TeamMember[]
 }
 
 export default function TeamPage() {
-  const [teams, setTeams] = useState<Team[]>([])
-  const [searchQuery, setSearchQuery] = useState('')
+  // Single team for the signed-in team lead
+  const [currentTeam, setCurrentTeam] = useState<Team | null>(null)
   const [isDragging, setIsDragging] = useState(false)
-  const [uploadError, setUploadError] = useState<string | null>(null)
-  const [uploadSuccess, setUploadSuccess] = useState<string | null>(null)
-  const [isAddDrawerOpen, setIsAddDrawerOpen] = useState(false)
+  const [isAddMemberDrawerOpen, setIsAddMemberDrawerOpen] = useState(false)
 
-  // Manual add form state
+  // Manual add member form state
   const [formData, setFormData] = useState({
-    name: '',
-    description: '',
-    manager: '',
+    memberName: '',
+    memberEmail: '',
   })
+
+  // Initialize with a default team (in real app, this would come from auth/context)
+  const initializeTeam = () => {
+    if (!currentTeam) {
+      setCurrentTeam({
+        id: 'team_current',
+        name: 'My Team',
+        description: 'My team members',
+        manager: 'Team Lead Name',
+        totalMembers: 0,
+        officeToday: 0,
+        officeThisWeek: 0,
+        members: [],
+      })
+    }
+  }
 
   const handleDragOver = (e: React.DragEvent<HTMLDivElement>) => {
     e.preventDefault()
@@ -55,8 +70,6 @@ export default function TeamPage() {
   const handleDrop = (e: React.DragEvent<HTMLDivElement>) => {
     e.preventDefault()
     setIsDragging(false)
-    setUploadError(null)
-    setUploadSuccess(null)
 
     const files = e.dataTransfer.files
     if (files.length > 0) {
@@ -71,15 +84,15 @@ export default function TeamPage() {
     }
   }
 
-  const parseTeamCSV = (text: string): Team[] => {
+  const parseTeamCSV = (text: string): TeamMember[] => {
     const lines = text.trim().split('\n')
     if (lines.length < 2) {
-      setUploadError('CSV must have headers and at least one row')
+      toast.error('CSV must have headers and at least one row')
       return []
     }
 
     const headers = lines[0].split(',').map(h => h.trim().toLowerCase())
-    const teamsMap: { [key: string]: Team } = {}
+    const members: TeamMember[] = []
 
     for (let i = 1; i < lines.length; i++) {
       const values = lines[i].split(',').map(v => v.trim())
@@ -89,97 +102,102 @@ export default function TeamPage() {
         row[header] = values[index] || ''
       })
 
-      if (!row.team_name) continue
+      if (!row.member_name || !row.member_email) continue
 
-      if (!teamsMap[row.team_name]) {
-        teamsMap[row.team_name] = {
-          id: `team_${Date.now()}_${Object.keys(teamsMap).length}`,
-          name: row.team_name,
-          description: row.team_description || '',
-          manager: row.manager || '',
-          totalMembers: 0,
-          officeToday: 0,
-          officeThisWeek: 0,
-          members: [],
-        }
-      }
-
-      if (row.member_name && row.member_email) {
-        teamsMap[row.team_name].members.push({
-          id: `m_${Date.now()}_${Math.random()}`,
-          name: row.member_name,
-          email: row.member_email,
-          officeToday: false,
-          daysThisWeek: 0,
-        })
-        teamsMap[row.team_name].totalMembers += 1
-      }
+      members.push({
+        id: `m_${Date.now()}_${Math.random()}`,
+        name: row.member_name,
+        email: row.member_email,
+        officeToday: false,
+        daysThisWeek: 0,
+      })
     }
 
-    return Object.values(teamsMap)
+    return members
   }
 
   const handleFileUpload = async (file: File) => {
     if (!file.name.endsWith('.csv')) {
-      setUploadError('Please upload a CSV file')
+      toast.error('Please upload a CSV file')
       return
     }
 
     try {
       const text = await file.text()
-      const parsedTeams = parseTeamCSV(text)
+      const members = parseTeamCSV(text)
 
-      if (parsedTeams.length === 0) {
-        setUploadError('No valid teams found in the CSV file')
+      if (members.length === 0) {
+        toast.error('No valid members found in the CSV file')
         return
       }
 
-      setTeams([...teams, ...parsedTeams])
-      setUploadSuccess(`Successfully imported ${parsedTeams.length} team${parsedTeams.length !== 1 ? 's' : ''}`)
-      setTimeout(() => setUploadSuccess(null), 3000)
+      // Initialize team if not already done
+      if (!currentTeam) {
+        initializeTeam()
+      }
+
+      // Update current team with new members
+      setCurrentTeam(prev => {
+        if (!prev) return prev
+        return {
+          ...prev,
+          members: [...(prev.members || []), ...members],
+          totalMembers: (prev.totalMembers || 0) + members.length,
+        }
+      })
+
+      toast.success(`Successfully imported ${members.length} member${members.length !== 1 ? 's' : ''}`)
     } catch (error) {
       console.error('Error parsing CSV:', error)
-      setUploadError('Error parsing CSV file. Please check the format.')
+      toast.error('Error parsing CSV file. Please check the format.')
     }
   }
 
-  const handleAddTeam = () => {
-    if (!formData.name.trim()) {
-      setUploadError('Team name is required')
+  const handleAddMember = () => {
+    if (!formData.memberName.trim() || !formData.memberEmail.trim()) {
+      toast.error('Member name and email are required')
       return
     }
 
-    const newTeam: Team = {
-      id: `team_${Date.now()}`,
-      name: formData.name,
-      description: formData.description,
-      manager: formData.manager,
-      totalMembers: 0,
-      officeToday: 0,
-      officeThisWeek: 0,
-      members: [],
+    if (!currentTeam) {
+      initializeTeam()
     }
 
-    setTeams([...teams, newTeam])
-    setFormData({ name: '', description: '', manager: '' })
-    setIsAddDrawerOpen(false)
-    setUploadSuccess('Team added successfully')
-    setTimeout(() => setUploadSuccess(null), 3000)
+    const newMember: TeamMember = {
+      id: `m_${Date.now()}`,
+      name: formData.memberName,
+      email: formData.memberEmail,
+      officeToday: false,
+      daysThisWeek: 0,
+    }
+
+    setCurrentTeam(prev => {
+      if (!prev) return prev
+      return {
+        ...prev,
+        members: [...(prev.members || []), newMember],
+        totalMembers: (prev.totalMembers || 0) + 1,
+      }
+    })
+
+    setFormData({ memberName: '', memberEmail: '' })
+    setIsAddMemberDrawerOpen(false)
+    toast.success('Member added successfully')
   }
 
   const downloadTemplate = () => {
-    const template = `team_name,team_description,manager,member_name,member_email
-Engineering,Software development and infrastructure,Sarah Chen,John Smith,john.smith@company.com
-Engineering,Software development and infrastructure,Sarah Chen,Emily Chen,emily.chen@company.com
-Sales & Business Development,Revenue generation and client relations,James Martinez,Rachel Green,rachel.green@company.com
-Operations & HR,Human resources and administration,Patricia Lee,Karen Rodriguez,karen.rodriguez@company.com`
+    const template = `member_name,member_email
+John Smith,john.smith@company.com
+Emily Chen,emily.chen@company.com
+Rachel Green,rachel.green@company.com
+Karen Rodriguez,karen.rodriguez@company.com`
 
     const blob = new Blob([template], { type: 'text/csv;charset=utf-8;' })
     const link = document.createElement('a')
     const url = URL.createObjectURL(blob)
     
     link.setAttribute('href', url)
-    link.setAttribute('download', 'teams-template.csv')
+    link.setAttribute('download', 'team-members-template.csv')
     link.style.visibility = 'hidden'
     
     document.body.appendChild(link)
@@ -191,242 +209,259 @@ Operations & HR,Human resources and administration,Patricia Lee,Karen Rodriguez,
     <div className="@container/main flex min-w-0 flex-1 flex-col gap-2">
       <div className="flex min-w-0 flex-1 flex-col gap-4 overflow-y-auto py-4 md:gap-6 md:py-6">
         {/* Header */}
-        <div className="px-4 lg:px-6">
-          <div>
-            <h1 className="text-3xl font-bold tracking-tight">Teams</h1>
-            <p className="text-muted-foreground mt-2">
-              Manage teams and team members
-            </p>
-          </div>
+        <div className="flex items-center justify-between px-4 lg:px-6">
+        <div>
+          <h1 className="text-3xl font-bold tracking-tight">Teams</h1>
+          <p className="text-muted-foreground mt-2">
+            Manage team members and office attendance
+          </p>
+        </div>
+        <div className="flex gap-2">
+          {/* Add Member Button */}
+          <Sheet open={isAddMemberDrawerOpen} onOpenChange={setIsAddMemberDrawerOpen}>
+            <SheetTrigger asChild>
+              <Button className="gap-2">
+                <IconPlus className="h-4 w-4" />
+                Add Member
+              </Button>
+            </SheetTrigger>
+            <SheetContent>
+              <SheetHeader>
+                <SheetTitle>Add Team Member</SheetTitle>
+                <SheetDescription>
+                  Add a new member to your team
+                </SheetDescription>
+              </SheetHeader>
+              <div className="mt-6 space-y-6">
+                <div className="space-y-2">
+                  <label className="text-sm font-medium">Member Name *</label>
+                  <Input
+                    placeholder="John Smith"
+                    value={formData.memberName}
+                    onChange={(e) =>
+                      setFormData({ ...formData, memberName: e.target.value })
+                    }
+                  />
+                </div>
+
+                <div className="space-y-2">
+                  <label className="text-sm font-medium">Member Email *</label>
+                  <Input
+                    placeholder="john.smith@company.com"
+                    value={formData.memberEmail}
+                    onChange={(e) =>
+                      setFormData({ ...formData, memberEmail: e.target.value })
+                    }
+                  />
+                </div>
+
+                <Button onClick={handleAddMember} className="w-full">
+                  Add Member
+                </Button>
+              </div>
+            </SheetContent>
+          </Sheet>
+        </div>
         </div>
 
-        {/* Alerts */}
-        {uploadError && (
-          <div className="px-4 lg:px-6 rounded-lg bg-destructive/10 border border-destructive/30 p-4 text-sm text-destructive">
-            {uploadError}
-          </div>
-        )}
+      {/* Team Metrics Cards */}
+      <div className="grid grid-cols-1 gap-4 px-4 lg:px-6 @xl/main:grid-cols-2 @5xl/main:grid-cols-4">
+        <Card className="@container/card dark:bg-zinc-900/50">
+          <CardHeader>
+            <div className="flex flex-col gap-1.5">
+              <CardDescription className="text-foreground">In Office Today</CardDescription>
+              <CardTitle className="text-2xl font-semibold tabular-nums text-foreground @[250px]/card:text-3xl">
+                {currentTeam?.officeToday ?? 0}
+              </CardTitle>
+            </div>
+            <CardAction>
+              <Badge variant="outline" className="text-foreground">
+                <IconTrendingUp className="h-4 w-4" />
+                +0%
+              </Badge>
+            </CardAction>
+          </CardHeader>
+          <CardFooter className="flex-col items-start gap-1.5 text-sm">
+            <div className="line-clamp-1 flex gap-2 font-medium text-foreground">
+              Office attendance active <IconTrendingUp className="size-4" />
+            </div>
+            <div className="text-muted-foreground">
+              {currentTeam ? `of ${currentTeam.totalMembers} members` : 'Load team to see details'}
+            </div>
+          </CardFooter>
+        </Card>
 
-        {uploadSuccess && (
-          <div className="px-4 lg:px-6 rounded-lg bg-green-100 border border-green-300 dark:bg-green-900/20 dark:border-green-800 p-4 text-sm text-green-800 dark:text-green-200">
-            {uploadSuccess}
-          </div>
-        )}
+        <Card className="@container/card dark:bg-zinc-900/50">
+          <CardHeader>
+            <div className="flex flex-col gap-1.5">
+              <CardDescription className="text-foreground">Occupancy Rate</CardDescription>
+              <CardTitle className="text-2xl font-semibold tabular-nums text-foreground @[250px]/card:text-3xl">
+                {currentTeam && currentTeam.totalMembers > 0 ? Math.round((currentTeam.officeToday / currentTeam.totalMembers) * 100) : 0}%
+              </CardTitle>
+            </div>
+            <CardAction>
+              <Badge variant="outline" className="text-foreground">
+                <IconTrendingUp className="h-4 w-4" />
+                +0%
+              </Badge>
+            </CardAction>
+          </CardHeader>
+          <CardFooter className="flex-col items-start gap-1.5 text-sm">
+            <div className="line-clamp-1 flex gap-2 font-medium text-foreground">
+              Team occupancy tracking <IconTrendingUp className="size-4" />
+            </div>
+            <div className="text-muted-foreground">
+              {currentTeam ? 'Based on current schedules' : 'No team data available'}
+            </div>
+          </CardFooter>
+        </Card>
 
-        {/* Main Content */}
-        {teams.length === 0 ? (
-          // Empty State
-          <div className="px-4 lg:px-6 grid gap-6">
-            <Card className="border-2 border-dashed">
+        <Card className="@container/card dark:bg-zinc-900/50">
+          <CardHeader>
+            <div className="flex flex-col gap-1.5">
+              <CardDescription className="text-foreground">Weekly Average</CardDescription>
+              <CardTitle className="text-2xl font-semibold tabular-nums text-foreground @[250px]/card:text-3xl">
+                {currentTeam && currentTeam.totalMembers > 0 ? Math.round((currentTeam.officeThisWeek / currentTeam.totalMembers) * 100) : 0}%
+              </CardTitle>
+            </div>
+            <CardAction>
+              <Badge variant="outline" className="text-foreground">
+                <IconTrendingUp className="h-4 w-4" />
+                +0%
+              </Badge>
+            </CardAction>
+          </CardHeader>
+          <CardFooter className="flex-col items-start gap-1.5 text-sm">
+            <div className="line-clamp-1 flex gap-2 font-medium text-foreground">
+              Weekly attendance patterns <IconTrendingUp className="size-4" />
+            </div>
+            <div className="text-muted-foreground">
+              {currentTeam ? 'This week' : 'Awaiting team information'}
+            </div>
+          </CardFooter>
+        </Card>
+
+        <Card className="@container/card dark:bg-zinc-900/50">
+          <CardHeader>
+            <div className="flex flex-col gap-1.5">
+              <CardDescription className="text-foreground">Total Members</CardDescription>
+              <CardTitle className="text-2xl font-semibold tabular-nums text-foreground @[250px]/card:text-3xl">
+                {currentTeam?.totalMembers ?? 0}
+              </CardTitle>
+            </div>
+            <CardAction>
+              <Badge variant="outline" className="text-foreground">
+                <IconTrendingUp className="h-4 w-4" />
+                +0%
+              </Badge>
+            </CardAction>
+          </CardHeader>
+          <CardFooter className="flex-col items-start gap-1.5 text-sm">
+            <div className="line-clamp-1 flex gap-2 font-medium text-foreground">
+              Team size overview <IconTrendingUp className="size-4" />
+            </div>
+            <div className="text-muted-foreground">
+              {currentTeam ? 'Active members' : 'Team size pending'}
+            </div>
+          </CardFooter>
+        </Card>
+      </div>
+
+      {/* Main Content */}
+      {!currentTeam ? (
+        // Empty State - Initialize Team
+        <div className="px-4 lg:px-6">
+          <Card className="border-2 border-dashed">
+            <CardContent className="pt-12 pb-12">
+              <div className="text-center space-y-6 max-w-md mx-auto">
+                <div className="flex justify-center">
+                  <div className="rounded-full bg-primary/10 p-4">
+                    <IconUpload className="h-8 w-8 text-primary" />
+                  </div>
+                </div>
+                <div className="space-y-2">
+                  <h3 className="text-xl font-semibold">Add team members</h3>
+                  <p className="text-muted-foreground">
+                    Get started by uploading a CSV file with your team members or add them manually.
+                  </p>
+                </div>
+
+                <div className="space-y-3 pt-4">
+                  {/* Upload Area */}
+                  <div
+                    onDragOver={handleDragOver}
+                    onDragLeave={handleDragLeave}
+                    onDrop={handleDrop}
+                    className={`relative border-2 border-dashed rounded-lg p-8 text-center cursor-pointer transition-colors ${
+                      isDragging
+                        ? 'border-primary bg-primary/5'
+                        : 'border-muted-foreground/25 hover:border-muted-foreground/50 hover:bg-muted/50'
+                    }`}
+                  >
+                    <input
+                      type="file"
+                      accept=".csv"
+                      onChange={handleFileSelect}
+                      className="hidden"
+                      id="csv-upload-empty"
+                    />
+                    <label
+                      htmlFor="csv-upload-empty"
+                      className="cursor-pointer flex flex-col gap-2 items-center"
+                    >
+                      <IconFile className="h-6 w-6 text-muted-foreground" />
+                      <span className="text-sm">
+                        Drag and drop your CSV file here, or click to select
+                      </span>
+                    </label>
+                  </div>
+
+                  {/* Or Divider */}
+                  <div className="relative">
+                    <div className="absolute inset-0 flex items-center">
+                      <Separator />
+                    </div>
+                    <div className="relative flex justify-center text-xs uppercase">
+                      <span className="bg-background px-2 text-muted-foreground">
+                        Or
+                      </span>
+                    </div>
+                  </div>
+
+                  {/* Download Template Button */}
+                  <Button 
+                    variant="outline" 
+                    className="w-full gap-2" 
+                    onClick={downloadTemplate}
+                  >
+                    <IconDownload className="h-4 w-4" />
+                    Download CSV Template
+                  </Button>
+                </div>
+              </div>
+            </CardContent>
+            </Card>
+          </div>
+      ) : (
+        // Team Loaded - Show Member Details
+        <div className="px-4 lg:px-6 flex-1 flex flex-col min-h-0">
+          {/* Team Members Table */}
+          {currentTeam.members && currentTeam.members.length > 0 ? (
+            <DataTableMembers
+              data={currentTeam.members}
+            />
+          ) : (
+            <Card>
               <CardContent className="pt-12 pb-12">
-                <div className="text-center space-y-6 max-w-md mx-auto">
-                  <div className="flex justify-center">
-                    <div className="rounded-full bg-primary/10 p-4">
-                      <IconUpload className="h-8 w-8 text-primary" />
-                    </div>
-                  </div>
-                  <div className="space-y-2">
-                    <h3 className="text-xl font-semibold">No teams yet</h3>
-                    <p className="text-muted-foreground">
-                      Get started by uploading a CSV file with team information and members or creating your first team manually.
-                    </p>
-                  </div>
-
-                  <div className="space-y-3 pt-4">
-                    {/* Upload Area */}
-                    <div
-                      onDragOver={handleDragOver}
-                      onDragLeave={handleDragLeave}
-                      onDrop={handleDrop}
-                      className={`relative border-2 border-dashed rounded-lg p-8 text-center cursor-pointer transition-colors ${
-                        isDragging
-                          ? 'border-primary bg-primary/5'
-                          : 'border-muted-foreground/25 hover:border-muted-foreground/50 hover:bg-muted/50'
-                      }`}
-                    >
-                      <input
-                        type="file"
-                        accept=".csv"
-                        onChange={handleFileSelect}
-                        className="absolute inset-0 opacity-0 cursor-pointer w-full h-full"
-                        aria-label="Upload CSV file"
-                      />
-                      <div className="flex flex-col items-center gap-2">
-                        <IconFile className="h-6 w-6 text-muted-foreground" />
-                        <div>
-                          <p className="font-medium text-sm">
-                            Drag & drop your CSV
-                          </p>
-                          <p className="text-xs text-muted-foreground">
-                            or click to browse
-                          </p>
-                        </div>
-                      </div>
-                    </div>
-
-                    {/* Or Divider */}
-                    <div className="relative">
-                      <div className="absolute inset-0 flex items-center">
-                        <Separator />
-                      </div>
-                      <div className="relative flex justify-center text-xs uppercase">
-                        <span className="bg-background px-2 text-muted-foreground">
-                          Or
-                        </span>
-                      </div>
-                    </div>
-
-                    {/* Download Template Button */}
-                    <Button 
-                      variant="outline" 
-                      className="w-full gap-2" 
-                      onClick={downloadTemplate}
-                    >
-                      <IconDownload className="h-4 w-4" />
-                      Download CSV Template
-                    </Button>
-
-                    <Separator />
-
-                    {/* Add Team Manual Button */}
-                    <Sheet open={isAddDrawerOpen} onOpenChange={setIsAddDrawerOpen}>
-                      <SheetTrigger asChild>
-                        <Button className="w-full gap-2">
-                          <IconPlus className="h-4 w-4" />
-                          Add Team Manually
-                        </Button>
-                      </SheetTrigger>
-                      <SheetContent>
-                        <SheetHeader>
-                          <SheetTitle>Add Team</SheetTitle>
-                          <SheetDescription>
-                            Create a new team manually
-                          </SheetDescription>
-                        </SheetHeader>
-                        <div className="mt-6 space-y-6">
-                          <div className="space-y-2">
-                            <label className="text-sm font-medium">Team Name *</label>
-                            <Input
-                              placeholder="Engineering"
-                              value={formData.name}
-                              onChange={(e) =>
-                                setFormData({ ...formData, name: e.target.value })
-                              }
-                            />
-                          </div>
-
-                          <div className="space-y-2">
-                            <label className="text-sm font-medium">Description</label>
-                            <Input
-                              placeholder="Software development and infrastructure"
-                              value={formData.description}
-                              onChange={(e) =>
-                                setFormData({ ...formData, description: e.target.value })
-                              }
-                            />
-                          </div>
-
-                          <div className="space-y-2">
-                            <label className="text-sm font-medium">Manager</label>
-                            <Input
-                              placeholder="John Smith"
-                              value={formData.manager}
-                              onChange={(e) =>
-                                setFormData({ ...formData, manager: e.target.value })
-                              }
-                            />
-                          </div>
-
-                          <Button onClick={handleAddTeam} className="w-full">
-                            Add Team
-                          </Button>
-                        </div>
-                      </SheetContent>
-                    </Sheet>
-                  </div>
+                <div className="text-center space-y-3">
+                  <p className="text-muted-foreground">No team members yet</p>
+                  <p className="text-sm text-muted-foreground">Upload a CSV file or add members manually to get started</p>
                 </div>
               </CardContent>
             </Card>
-          </div>
-        ) : (
-          // Teams List
-          <div className="flex flex-col gap-6 flex-1 min-h-0 px-4 lg:px-6">
-            {/* Teams Count and Actions */}
-            <div className="flex items-center justify-between">
-              <div className="text-sm text-muted-foreground">
-                Showing {teams.length} team{teams.length !== 1 ? 's' : ''}
-              </div>
-              <Sheet open={isAddDrawerOpen} onOpenChange={setIsAddDrawerOpen}>
-                <SheetTrigger asChild>
-                  <Button className="gap-2">
-                    <IconPlus className="h-4 w-4" />
-                    Add Team
-                  </Button>
-                </SheetTrigger>
-                <SheetContent>
-                  <SheetHeader>
-                    <SheetTitle>Add Team</SheetTitle>
-                    <SheetDescription>
-                      Create a new team
-                    </SheetDescription>
-                  </SheetHeader>
-                  <div className="mt-6 space-y-6">
-                    <div className="space-y-2">
-                      <label className="text-sm font-medium">Team Name *</label>
-                      <Input
-                        placeholder="Engineering"
-                        value={formData.name}
-                        onChange={(e) =>
-                          setFormData({ ...formData, name: e.target.value })
-                        }
-                      />
-                    </div>
-
-                    <div className="space-y-2">
-                      <label className="text-sm font-medium">Description</label>
-                      <Input
-                        placeholder="Software development and infrastructure"
-                        value={formData.description}
-                        onChange={(e) =>
-                          setFormData({ ...formData, description: e.target.value })
-                        }
-                      />
-                    </div>
-
-                    <div className="space-y-2">
-                      <label className="text-sm font-medium">Manager</label>
-                      <Input
-                        placeholder="John Smith"
-                        value={formData.manager}
-                        onChange={(e) =>
-                          setFormData({ ...formData, manager: e.target.value })
-                        }
-                      />
-                    </div>
-
-                    <Button onClick={handleAddTeam} className="w-full">
-                      Add Team
-                    </Button>
-                  </div>
-                </SheetContent>
-              </Sheet>
-            </div>
-
-            {/* Teams Table */}
-            <div 
-              className="flex-1 flex flex-col min-h-0 overflow-y-auto"
-              onDragOver={handleDragOver}
-              onDragLeave={handleDragLeave}
-              onDrop={handleDrop}
-            >
-              <DataTableTeams
-                data={teams}
-                searchQuery={searchQuery}
-                onSearchChange={setSearchQuery}
-              />
-            </div>
-          </div>
-        )}
+          )}
+        </div>
+      )}
       </div>
     </div>
   )

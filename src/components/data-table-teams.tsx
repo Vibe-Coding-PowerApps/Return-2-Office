@@ -59,6 +59,13 @@ export type Team = {
   totalMembers: number
   officeToday: number
   officeThisWeek: number
+  members?: {
+    id: string
+    name: string
+    email: string
+    officeToday: boolean
+    daysThisWeek: number
+  }[]
 }
 
 function DragHandle({ id }: { id: string }) {
@@ -89,9 +96,12 @@ const columns: ColumnDef<Team>[] = [
   {
     accessorKey: "name",
     header: "Team Name",
-    cell: ({ row }) => (
-      <span className="font-medium text-sm">{row.original.name}</span>
-    ),
+    cell: ({ row }) => {
+      // This will be handled in the component body to access onTeamClick
+      return (
+        <span className="font-medium text-sm">{row.original.name}</span>
+      )
+    },
   },
   {
     accessorKey: "manager",
@@ -118,7 +128,7 @@ const columns: ColumnDef<Team>[] = [
           {row.original.officeToday}
         </Badge>
         <span className="text-xs text-muted-foreground">
-          ({Math.round((row.original.officeToday / row.original.totalMembers) * 100)}%)
+          ({Math.round((row.original.totalMembers > 0 ? row.original.officeToday / row.original.totalMembers : 0) * 100)}%)
         </span>
       </div>
     ),
@@ -129,7 +139,7 @@ const columns: ColumnDef<Team>[] = [
     cell: ({ row }) => (
       <div className="flex items-center gap-2">
         <Badge variant="outline" className="text-muted-foreground">
-          {Math.round((row.original.officeThisWeek / row.original.totalMembers) * 100)}%
+          {Math.round((row.original.totalMembers > 0 ? row.original.officeThisWeek / row.original.totalMembers : 0) * 100)}%
         </Badge>
       </div>
     ),
@@ -138,9 +148,10 @@ const columns: ColumnDef<Team>[] = [
 
 interface DragRowProps {
   row: any
+  onTeamClick?: (team: Team) => void
 }
 
-function DragRow({ row }: DragRowProps) {
+function DragRow({ row, onTeamClick }: DragRowProps) {
   const { transform, transition, setNodeRef, isDragging } = useSortable({
     id: row.original.id,
   })
@@ -158,11 +169,25 @@ function DragRow({ row }: DragRowProps) {
       data-state={row.getIsSelected() && "selected"}
       className={`${isDragging ? "bg-muted" : "hover:bg-muted/50"}`}
     >
-      {row.getVisibleCells().map((cell: any) => (
-        <TableCell key={cell.id} className="py-4">
-          {flexRender(cell.column.columnDef.cell, cell.getContext())}
-        </TableCell>
-      ))}
+      {row.getVisibleCells().map((cell: any) => {
+        if (cell.column.id === "name" && onTeamClick) {
+          return (
+            <TableCell key={cell.id} className="py-4">
+              <button
+                onClick={() => onTeamClick(row.original)}
+                className="font-medium text-sm hover:underline cursor-pointer text-left"
+              >
+                {row.original.name}
+              </button>
+            </TableCell>
+          )
+        }
+        return (
+          <TableCell key={cell.id} className="py-4">
+            {flexRender(cell.column.columnDef.cell, cell.getContext())}
+          </TableCell>
+        )
+      })}
     </TableRow>
   )
 }
@@ -171,12 +196,14 @@ interface DataTableTeamsProps {
   data: Team[]
   searchQuery: string
   onSearchChange: (query: string) => void
+  onTeamClick?: (team: Team) => void
 }
 
 export function DataTableTeams({
   data: initialData,
   searchQuery,
   onSearchChange,
+  onTeamClick,
 }: DataTableTeamsProps) {
   const [data, setData] = React.useState(initialData)
   const [sorting, setSorting] = React.useState<SortingState>([])
@@ -291,7 +318,7 @@ export function DataTableTeams({
               >
                 {table.getRowModel().rows?.length ? (
                   table.getRowModel().rows.map((row: any) => (
-                    <DragRow key={row.id} row={row} />
+                    <DragRow key={row.id} row={row} onTeamClick={onTeamClick} />
                   ))
                 ) : (
                   <TableRow>

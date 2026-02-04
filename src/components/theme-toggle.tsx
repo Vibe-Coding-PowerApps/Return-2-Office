@@ -30,20 +30,14 @@ export function ThemeToggle() {
   return (
     <button 
       onClick={() => setTheme(isDark ? "light" : "dark")}
-      className="relative inline-flex items-center justify-center rounded-full bg-muted p-0.5 transition-colors hover:bg-muted/80 border border-input"
+      className="relative inline-flex items-center justify-center rounded-full bg-muted p-0.5 transition-colors hover:bg-muted/80 border border-input w-14 h-7"
       aria-label="Toggle theme"
-      style={{ width: "56px", height: "28px" }}
     >
       {/* Animated sliding background */}
       <div 
-        className="absolute w-6 h-6 rounded-full bg-background transition-transform duration-300"
-        style={{ 
-          transform: isDark ? "translateX(12px)" : "translateX(-12px)",
-          top: "50%",
-          left: "50%",
-          marginTop: "-12px",
-          marginLeft: "-12px"
-        }}
+        className={`absolute w-6 h-6 rounded-full bg-background transition-transform duration-300 ${
+          isDark ? "translate-x-3" : "-translate-x-3"
+        }`}
       />
       
       {/* Light mode icon */}
