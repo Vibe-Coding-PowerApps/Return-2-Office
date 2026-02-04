@@ -194,9 +194,9 @@ const columns: ColumnDef<z.infer<typeof schema>>[] = [
     cell: ({ row }) => (
       <Badge variant="outline" className="text-muted-foreground px-3 py-1.5 gap-1.5 flex items-center w-fit">
         {row.original.status === "Active" ? (
-          <div className="size-4 rounded-full bg-green-500"></div>
+          <div className="size-3 rounded-full bg-green-100 border-2 border-green-800"></div>
         ) : row.original.status === "Signed Out" ? (
-          <div className="size-4 rounded-full bg-amber-500"></div>
+          <div className="size-3 rounded-full bg-amber-100 border-2 border-amber-800"></div>
         ) : (
           <div className="size-4 border border-muted-foreground rounded-full"></div>
         )}
