@@ -134,7 +134,7 @@ export function AppSidebar({ userData, ...props }: React.ComponentProps<typeof S
             >
               <Link to="/app/dashboard">
                 <IconBuildingSkyscraper className="!size-5" />
-                <span className="text-base font-semibold">Return 2 Office</span>
+                <span className="text-base font-semibold">Return to Office</span>
               </Link>
             </SidebarMenuButton>
           </SidebarMenuItem>

@@ -12,6 +12,7 @@ import {
   type DragEndEvent,
   type UniqueIdentifier,
 } from "@dnd-kit/core"
+import type { SyntheticListenerMap } from "@dnd-kit/core/dist/hooks/utilities"
 import { restrictToVerticalAxis } from "@dnd-kit/modifiers"
 import {
   arrayMove,
@@ -122,16 +123,20 @@ function EditRowMenu({ row, onEditRow }: EditRowMenuProps) {
   )
 }
 
+// Context for drag handle to access parent row's listeners
+const DragContextProvider = React.createContext<{
+  listeners?: SyntheticListenerMap
+  attributes?: Record<string, any>
+} | null>(null)
+
 // Create a separate component for the drag handle
-function DragHandle({ id }: { id: number }) {
-  const { attributes, listeners } = useSortable({
-    id,
-  })
+function DragHandle() {
+  const dragContext = React.useContext(DragContextProvider)
 
   return (
     <Button
-      {...attributes}
-      {...listeners}
+      {...dragContext?.attributes}
+      {...dragContext?.listeners}
       variant="ghost"
       size="icon"
       className="text-muted-foreground size-7 hover:bg-transparent"
@@ -146,7 +151,7 @@ const getColumns = (onEditRow?: (scheduleId: string) => void): ColumnDef<z.infer
   {
     id: "drag",
     header: () => null,
-    cell: ({ row }) => <DragHandle id={row.original.id} />,
+    cell: ({ row }) => <DragHandle />,
   },
   {
     id: "select",
@@ -214,27 +219,29 @@ const getColumns = (onEditRow?: (scheduleId: string) => void): ColumnDef<z.infer
 ]
 
 function DraggableRow({ row }: { row: Row<z.infer<typeof scheduleSchema>> }) {
-  const { transform, transition, setNodeRef, isDragging } = useSortable({
+  const { transform, transition, setNodeRef, isDragging, attributes, listeners } = useSortable({
     id: row.original.id,
   })
 
   return (
-    <TableRow
-      data-state={row.getIsSelected() && "selected"}
-      data-dragging={isDragging}
-      ref={setNodeRef}
-      className="relative z-0 data-[dragging=true]:z-10 data-[dragging=true]:opacity-80"
-      style={{
-        transform: CSS.Transform.toString(transform),
-        transition: transition,
-      }}
-    >
-      {row.getVisibleCells().map((cell) => (
-        <TableCell key={cell.id}>
-          {flexRender(cell.column.columnDef.cell, cell.getContext())}
-        </TableCell>
-      ))}
-    </TableRow>
+    <DragContextProvider.Provider value={{ attributes, listeners }}>
+      <TableRow
+        data-state={row.getIsSelected() && "selected"}
+        data-dragging={isDragging}
+        ref={setNodeRef}
+        className="relative z-0 data-[dragging=true]:z-10 data-[dragging=true]:opacity-80"
+        style={{
+          transform: CSS.Transform.toString(transform),
+          transition: transition,
+        }}
+      >
+        {row.getVisibleCells().map((cell) => (
+          <TableCell key={cell.id}>
+            {flexRender(cell.column.columnDef.cell, cell.getContext())}
+          </TableCell>
+        ))}
+      </TableRow>
+    </DragContextProvider.Provider>
   )
 }
 
@@ -296,8 +303,8 @@ export function DataTableSchedules({
   })
 
   const dataIds = React.useMemo<UniqueIdentifier[]>(
-    () => table.getRowModel().rows.map(({ original }) => original.id) || [],
-    [table.getRowModel().rows]
+    () => data.map(row => row.id) || [],
+    [data]
   )
 
   function handleDragEnd(event: DragEndEvent) {
