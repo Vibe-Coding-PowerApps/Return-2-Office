@@ -36,7 +36,7 @@ export function NavDocuments({
   return (
     <SidebarGroup>
       <SidebarGroupLabel>Workplace Hub</SidebarGroupLabel>
-      <SidebarGroupContent>
+      <SidebarGroupContent className="flex flex-col gap-2 px-2">
         <SidebarMenu>
           {items.map((item) => (
             <SidebarMenuItem key={item.name}>

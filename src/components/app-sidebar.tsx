@@ -126,11 +126,10 @@ export function AppSidebar({ userData, ...props }: React.ComponentProps<typeof S
   return (
     <Sidebar collapsible="offcanvas" {...props}>
       <SidebarHeader>
-        <SidebarMenu>
+        <SidebarMenu className="px-2">
           <SidebarMenuItem>
             <SidebarMenuButton
               asChild
-              className="data-[slot=sidebar-menu-button]:!p-1.5"
             >
               <Link to="/app/dashboard">
                 <IconBuildingSkyscraper className="!size-5" />
