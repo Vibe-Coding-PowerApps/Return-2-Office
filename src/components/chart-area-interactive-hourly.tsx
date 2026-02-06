@@ -149,7 +149,7 @@ export function ChartAreaInteractiveHourly({ selectedFloor = 1, selectedTime = "
   }
 
   return (
-    <Card>
+    <Card className="@container/card dark:bg-zinc-900/50">
       <CardHeader>
         <div className="space-y-1.5">
           <CardTitle>Peak Hours by Period</CardTitle>

@@ -18,7 +18,18 @@ import { Button } from '@/ui/button'
 import { Separator } from '@/ui/separator'
 import { Popover, PopoverContent, PopoverTrigger } from '@/ui/popover'
 import { Input } from '@/ui/input'
-import { IconArmchair, IconCalendarEvent, IconX, IconCalendar, IconPencil, IconPlus, IconTrendingUp, IconTrendingDown, IconUpload, IconTrash } from '@tabler/icons-react'
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from '@/ui/alert-dialog'
+
+import { IconArmchair, IconCalendarEvent, IconX, IconCalendar, IconPencil, IconPlus, IconTrendingUp, IconTrendingDown, IconUpload, IconTrash, IconClock, IconMapPin, IconCalendarStats } from '@tabler/icons-react'
 import { DatePickerCalendar } from '@/components/date-picker-calendar'
 import { format } from 'date-fns'
 
@@ -36,6 +47,8 @@ type Reservation = {
   deskId: string
   date: string
   userName: string
+  startTime: string
+  endTime: string
 }
 
 const desks: Desk[] = [
@@ -66,6 +79,8 @@ export default function WorkplaceUtilizationPage() {
   const [cancelingReservation, setCancelingReservation] = useState<{ deskId: string; date: string } | null>(null)
   const [startTime, setStartTime] = useState('09:00')
   const [endTime, setEndTime] = useState('17:00')
+  const [reschedulingReservation, setReschedulingReservation] = useState<Reservation | null>(null)
+  const [reservationFilterStatus, setReservationFilterStatus] = useState<'all' | 'upcoming' | 'past'>('upcoming')
   const [isAdminMode, setIsAdminMode] = useState(false)
   const [adminPassword, setAdminPassword] = useState('')
   const [showAdminPasswordDialog, setShowAdminPasswordDialog] = useState(false)
@@ -302,14 +317,34 @@ export default function WorkplaceUtilizationPage() {
       return
     }
 
-    // Add reservation
-    setReservations([...reservations, {
-      deskId: selectedDesk,
-      date: selectedDate,
-      userName: 'You'
-    }])
+    if (reschedulingReservation) {
+      // Update existing reservation
+      setReservations(reservations.map(r => {
+        if (r.deskId === reschedulingReservation.deskId && r.date === reschedulingReservation.date) {
+          return {
+            ...r,
+            deskId: selectedDesk,
+            date: selectedDate,
+            startTime: startTime,
+            endTime: endTime
+          }
+        }
+        return r
+      }))
+      setReservationMessage('✓ Reservation rescheduled successfully!')
+      setReschedulingReservation(null)
+    } else {
+      // Add new reservation
+      setReservations([...reservations, {
+        deskId: selectedDesk,
+        date: selectedDate,
+        userName: 'You',
+        startTime: startTime,
+        endTime: endTime
+      }])
+      setReservationMessage('✓ Desk reserved successfully!')
+    }
 
-    setReservationMessage('✓ Desk reserved successfully!')
     setSelectedDesk(null)
     setSelectedDate('')
 
@@ -332,6 +367,30 @@ export default function WorkplaceUtilizationPage() {
     }
   }
 
+  const openRescheduleDrawer = (reservation: Reservation) => {
+    const desk = desks.find(d => d.id === reservation.deskId)
+    setReschedulingReservation(reservation)
+    setReservationFloor(desk?.floor.toString() || '1')
+    setSelectedDate(reservation.date)
+    setStartTime(reservation.startTime)
+    setEndTime(reservation.endTime)
+    setSelectedDesk(reservation.deskId)
+    setIsReserveDrawerOpen(true)
+  }
+
+  const handleDrawerClose = (open: boolean) => {
+    setIsReserveDrawerOpen(open)
+    if (!open) {
+      // Reset reschedule mode when drawer closes
+      setReschedulingReservation(null)
+      setSelectedDesk(null)
+      setSelectedDate('')
+      setStartTime('09:00')
+      setEndTime('17:00')
+      setReservationMessage('')
+    }
+  }
+
   const isReservedForDate = (deskId: string, date: string) => {
     return reservations.some(r => r.deskId === deskId && r.date === date)
   }
@@ -349,6 +408,19 @@ export default function WorkplaceUtilizationPage() {
   // Get floor map for current selected floor
   const getCurrentFloorMap = () => {
     return uploadedFloorMaps.find(m => m.floor === selectedFloor)
+  }
+
+  const getFilteredReservations = () => {
+    const now = new Date()
+    const todayStr = now.toISOString().split('T')[0]
+    switch (reservationFilterStatus) {
+      case 'upcoming':
+        return reservations.filter(r => r.date >= todayStr)
+      case 'past':
+        return reservations.filter(r => r.date < todayStr)
+      default:
+        return reservations
+    }
   }
 
   const availableDesksForFloor = getAvailableDesksByFloor(parseInt(reservationFloor))
@@ -434,7 +506,7 @@ export default function WorkplaceUtilizationPage() {
               </Button>
             )}
             {!isAdminMode && (
-              <Sheet open={isReserveDrawerOpen} onOpenChange={setIsReserveDrawerOpen}>
+              <Sheet open={isReserveDrawerOpen} onOpenChange={handleDrawerClose}>
                 <SheetTrigger asChild>
                   <Button size="sm" variant="outline" className="gap-2 ml-2">
                     <IconArmchair className="size-4" />
@@ -443,16 +515,18 @@ export default function WorkplaceUtilizationPage() {
                 </SheetTrigger>
               <SheetContent side="right" className="w-full max-w-md overflow-y-auto">
                 <SheetHeader>
-                  <SheetTitle>Reserve a Desk</SheetTitle>
+                  <SheetTitle>{reschedulingReservation ? 'Reschedule Reservation' : 'Reserve a Desk'}</SheetTitle>
                   <SheetDescription>
-                    Reserve a desk for your office days. You can reserve up to 30 days in advance.
+                    {reschedulingReservation
+                      ? 'Update the date, time, or desk for your reservation.'
+                      : 'Reserve a desk for your office days. You can reserve up to 30 days in advance.'}
                   </SheetDescription>
                 </SheetHeader>
 
                 <div className="space-y-6 py-6">
                   {/* Reserve a Desk Form */}
                   <div className="space-y-8">
-                    <h3 className="font-semibold text-sm">Reserve a Desk</h3>
+                    <h3 className="font-semibold text-sm">{reschedulingReservation ? 'Reschedule Reservation' : 'Reserve a Desk'}</h3>
                     <div className="space-y-6">
                       <div className="space-y-2">
                         <label htmlFor="reserve-floor" className="text-sm font-medium">Select Floor</label>
@@ -561,7 +635,7 @@ export default function WorkplaceUtilizationPage() {
                       </div>
                       <Button onClick={handleReservation} className="w-full" disabled={availableDesksForFloor.length === 0}>
                         <IconCalendarEvent className="mr-2 size-4" />
-                        Reserve
+                        {reschedulingReservation ? 'Save Changes' : 'Reserve'}
                       </Button>
                       {reservationMessage && (
                         <p className={`text-sm ${reservationMessage.includes('✓') ? 'text-green-600' : 'text-red-600'}`}>
@@ -571,67 +645,6 @@ export default function WorkplaceUtilizationPage() {
                     </div>
                   </div>
 
-                  {reservations.length > 0 && (
-                    <>
-                      <Separator />
-                      <div className="space-y-3">
-                        <h3 className="font-semibold text-sm">My Reservations</h3>
-                        <div className="space-y-2">
-                          {reservations.map((res, idx) => {
-                            const desk = desks.find(d => d.id === res.deskId)
-                            return (
-                              <Card key={idx} className="p-3">
-                                <div className="flex items-start justify-between gap-3">
-                                  <div className="flex-1 min-w-0">
-                                    <p className="font-medium text-sm truncate">{desk?.name}</p>
-                                    <p className="text-xs text-muted-foreground">
-                                      {new Date(res.date).toLocaleDateString('en-US', { month: 'short', day: 'numeric' })} • Floor {desk?.floor}
-                                    </p>
-                                  </div>
-                                  <Button
-                                    variant="ghost"
-                                    size="sm"
-                                    onClick={() => cancelReservation(res.deskId, res.date)}
-                                    className="h-8 w-8 p-0"
-                                  >
-                                    <IconX className="size-4" />
-                                  </Button>
-                                </div>
-                              </Card>
-                            )
-                          })}
-                        </div>
-                      </div>
-                    </>
-                  )}
-
-                  {/* Confirmation Dialog for Canceling Reservation */}
-                  {cancelDialogOpen && (
-                    <div className="fixed inset-0 z-[100] bg-black/50 flex items-center justify-center pointer-events-none">
-                      <Card className="w-96 p-6 space-y-4 pointer-events-auto">
-                        <div>
-                          <h2 className="text-lg font-semibold">Cancel Reservation</h2>
-                          <p className="text-sm text-muted-foreground mt-2">
-                            Are you sure you want to cancel your reservation for <strong>{cancelingReservation && desks.find(d => d.id === cancelingReservation.deskId)?.name}</strong> on <strong>{cancelingReservation && new Date(cancelingReservation.date).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })}</strong>? This action cannot be undone.
-                          </p>
-                        </div>
-                        <div className="flex gap-2 justify-end">
-                          <Button variant="outline" onClick={(e) => {
-                            e.stopPropagation()
-                            setCancelDialogOpen(false)
-                          }}>
-                            Keep Reservation
-                          </Button>
-                          <Button variant="default" onClick={(e) => {
-                            e.stopPropagation()
-                            confirmCancelReservation()
-                          }}>
-                            Cancel Reservation
-                          </Button>
-                        </div>
-                      </Card>
-                    </div>
-                  )}
                 </div>
               </SheetContent>
             </Sheet>
@@ -745,6 +758,14 @@ export default function WorkplaceUtilizationPage() {
             <TabsList>
               <TabsTrigger value="floormap">Floor Map</TabsTrigger>
               <TabsTrigger value="timeline">Occupancy Timeline</TabsTrigger>
+              <TabsTrigger value="reservations">
+                My Reservations
+                {reservations.length > 0 && (
+                  <Badge variant="secondary" className="ml-1 h-5 min-w-5 px-1.5 text-[10px]">
+                    {reservations.length}
+                  </Badge>
+                )}
+              </TabsTrigger>
             </TabsList>
 
             <TabsContent value="floormap">
@@ -776,6 +797,131 @@ export default function WorkplaceUtilizationPage() {
 
             <TabsContent value="timeline">
               <ChartAreaInteractiveHourly selectedFloor={selectedFloor} selectedTime={selectedTime} />
+            </TabsContent>
+
+            <TabsContent value="reservations">
+              <Card className="@container/card dark:bg-zinc-900/50">
+                <CardHeader>
+                  <div className="flex flex-col gap-1.5">
+                    <CardTitle className="text-lg">My Reservations</CardTitle>
+                    <CardDescription>View and manage your desk reservations</CardDescription>
+                  </div>
+                  <CardAction>
+                    <Select value={reservationFilterStatus} onValueChange={(val: 'all' | 'upcoming' | 'past') => setReservationFilterStatus(val)}>
+                      <SelectTrigger className="w-[140px] h-9">
+                        <SelectValue />
+                      </SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="upcoming">Upcoming</SelectItem>
+                        <SelectItem value="past">Past</SelectItem>
+                        <SelectItem value="all">All</SelectItem>
+                      </SelectContent>
+                    </Select>
+                  </CardAction>
+                </CardHeader>
+                <CardContent>
+                  {reservations.length === 0 ? (
+                    <div className="flex flex-col items-center justify-center py-12 text-center">
+                      <div className="rounded-full bg-muted p-4 mb-4">
+                        <IconCalendarEvent className="size-8 text-muted-foreground" />
+                      </div>
+                      <h3 className="text-base font-semibold text-foreground">No reservations yet</h3>
+                      <p className="text-sm text-muted-foreground mt-1 max-w-xs">
+                        Reserve a desk using the "Reserve a Desk" button above to get started.
+                      </p>
+                    </div>
+                  ) : getFilteredReservations().length === 0 ? (
+                    <div className="flex flex-col items-center justify-center py-12 text-center">
+                      <div className="rounded-full bg-muted p-4 mb-4">
+                        <IconCalendarEvent className="size-8 text-muted-foreground" />
+                      </div>
+                      <h3 className="text-base font-semibold text-foreground">No {reservationFilterStatus} reservations</h3>
+                      <p className="text-sm text-muted-foreground mt-1">Try a different filter to see other reservations.</p>
+                    </div>
+                  ) : (
+                    <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
+                      {getFilteredReservations().map((res, idx) => {
+                        const desk = desks.find(d => d.id === res.deskId)
+                        const resDate = new Date(res.date)
+                        const isPast = resDate < new Date(new Date().toISOString().split('T')[0])
+                        const isToday = res.date === new Date().toISOString().split('T')[0]
+                        return (
+                          <Card key={`${res.deskId}-${res.date}-${idx}`} className={`@container/card dark:bg-zinc-900/50 relative overflow-hidden transition-colors ${isPast ? 'opacity-60' : ''}`}>
+                            {isToday && (
+                              <div className="absolute top-0 left-0 right-0 h-1 bg-primary" />
+                            )}
+                            <CardHeader className="p-4 pb-2 flex-col items-start gap-1.5 space-y-0">
+                              <div className="flex w-full items-start justify-between">
+                                <div className="flex items-center gap-2">
+                                  <div className="rounded-md bg-primary/10 p-1.5">
+                                    <IconArmchair className="size-4 text-primary" />
+                                  </div>
+                                  <div>
+                                    <p className="font-semibold text-sm text-foreground">{desk?.name || res.deskId}</p>
+                                    <p className="text-xs text-muted-foreground">Section {desk?.section}</p>
+                                  </div>
+                                </div>
+                                {isToday ? (
+                                  <Badge variant="default" className="text-[10px] px-2">Today</Badge>
+                                ) : isPast ? (
+                                  <Badge variant="secondary" className="text-[10px] px-2">Past</Badge>
+                                ) : (
+                                  <Badge variant="outline" className="text-[10px] px-2">Upcoming</Badge>
+                                )}
+                              </div>
+                            </CardHeader>
+                            <CardContent className="p-4 pt-2 space-y-2">
+                              <div className="space-y-1.5 text-sm">
+                                <div className="flex items-center gap-2 text-muted-foreground">
+                                  <IconCalendar className="size-3.5" />
+                                  <span>{resDate.toLocaleDateString('en-US', { weekday: 'short', month: 'short', day: 'numeric', year: 'numeric' })}</span>
+                                </div>
+                                <div className="flex items-center gap-2 text-muted-foreground">
+                                  <IconClock className="size-3.5" />
+                                  <span>
+                                    {new Date(`2000-01-01T${res.startTime}`).toLocaleTimeString([], { hour: 'numeric', minute: '2-digit', hour12: true })}
+                                    {' – '}
+                                    {new Date(`2000-01-01T${res.endTime}`).toLocaleTimeString([], { hour: 'numeric', minute: '2-digit', hour12: true })}
+                                  </span>
+                                </div>
+                                <div className="flex items-center gap-2 text-muted-foreground">
+                                  <IconMapPin className="size-3.5" />
+                                  <span>Floor {desk?.floor}</span>
+                                </div>
+                              </div>
+                              {!isPast && (
+                                <>
+                                  <Separator />
+                                  <div className="flex gap-2 pt-1">
+                                    <Button
+                                      variant="outline"
+                                      size="sm"
+                                      className="flex-1 h-8 text-xs gap-1.5"
+                                      onClick={() => openRescheduleDrawer(res)}
+                                    >
+                                      <IconCalendarEvent className="size-3.5" />
+                                      Reschedule
+                                    </Button>
+                                    <Button
+                                      variant="outline"
+                                      size="sm"
+                                      className="flex-1 h-8 text-xs gap-1.5 text-destructive hover:text-destructive hover:bg-destructive/10 border-destructive/30"
+                                      onClick={() => cancelReservation(res.deskId, res.date)}
+                                    >
+                                      <IconTrash className="size-3.5" />
+                                      Cancel
+                                    </Button>
+                                  </div>
+                                </>
+                              )}
+                            </CardContent>
+                          </Card>
+                        )
+                      })}
+                    </div>
+                  )}
+                </CardContent>
+              </Card>
             </TabsContent>
           </Tabs>
         </div>
@@ -1068,6 +1214,26 @@ export default function WorkplaceUtilizationPage() {
           </Card>
         </div>
       )}
+
+      {/* Cancel Reservation AlertDialog */}
+      <AlertDialog open={cancelDialogOpen} onOpenChange={setCancelDialogOpen}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Cancel Reservation</AlertDialogTitle>
+            <AlertDialogDescription>
+              Are you sure you want to cancel your reservation for{' '}
+              <strong>{cancelingReservation && desks.find(d => d.id === cancelingReservation.deskId)?.name}</strong>{' '}
+              on{' '}
+              <strong>{cancelingReservation && new Date(cancelingReservation.date).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })}</strong>?
+              This action cannot be undone.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel>Keep Reservation</AlertDialogCancel>
+            <AlertDialogAction onClick={confirmCancelReservation}>Cancel Reservation</AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
 
       {/* Hidden File Input for Floor Map Upload */}
       <input
