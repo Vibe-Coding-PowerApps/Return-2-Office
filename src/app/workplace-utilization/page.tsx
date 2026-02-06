@@ -492,21 +492,47 @@ export default function WorkplaceUtilizationPage() {
                       <div className="grid grid-cols-2 gap-4">
                         <div className="space-y-2">
                           <label htmlFor="start-time" className="text-sm font-medium">Start Time</label>
-                          <Input
-                            id="start-time"
-                            type="time"
-                            value={startTime}
-                            onChange={(e) => setStartTime(e.target.value)}
-                          />
+                          <Select value={startTime} onValueChange={setStartTime}>
+                            <SelectTrigger id="start-time">
+                              <SelectValue placeholder="Select start time" />
+                            </SelectTrigger>
+                            <SelectContent className="max-h-60">
+                              {[
+                                '08:00', '08:30', '09:00', '09:30', '10:00', '10:30', '11:00', '11:30',
+                                '12:00', '12:30', '13:00', '13:30', '14:00', '14:30', '15:00', '15:30', '16:00'
+                              ].map((time) => (
+                                <SelectItem key={time} value={time}>
+                                  {new Date(`2000-01-01T${time}`).toLocaleTimeString([], { 
+                                    hour: 'numeric', 
+                                    minute: '2-digit',
+                                    hour12: true 
+                                  })}
+                                </SelectItem>
+                              ))}
+                            </SelectContent>
+                          </Select>
                         </div>
                         <div className="space-y-2">
                           <label htmlFor="end-time" className="text-sm font-medium">End Time</label>
-                          <Input
-                            id="end-time"
-                            type="time"
-                            value={endTime}
-                            onChange={(e) => setEndTime(e.target.value)}
-                          />
+                          <Select value={endTime} onValueChange={setEndTime}>
+                            <SelectTrigger id="end-time">
+                              <SelectValue placeholder="Select end time" />
+                            </SelectTrigger>
+                            <SelectContent className="max-h-60">
+                              {[
+                                '09:00', '09:30', '10:00', '10:30', '11:00', '11:30', '12:00', '12:30',
+                                '13:00', '13:30', '14:00', '14:30', '15:00', '15:30', '16:00', '16:30', '17:00', '17:30', '18:00'
+                              ].map((time) => (
+                                <SelectItem key={time} value={time}>
+                                  {new Date(`2000-01-01T${time}`).toLocaleTimeString([], { 
+                                    hour: 'numeric', 
+                                    minute: '2-digit',
+                                    hour12: true 
+                                  })}
+                                </SelectItem>
+                              ))}
+                            </SelectContent>
+                          </Select>
                         </div>
                       </div>
                       <div className="space-y-2">
