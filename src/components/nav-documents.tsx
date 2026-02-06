@@ -35,7 +35,7 @@ export function NavDocuments({
 
   return (
     <SidebarGroup>
-      <SidebarGroupLabel>Workspace Hub</SidebarGroupLabel>
+      <SidebarGroupLabel>Workplace Hub</SidebarGroupLabel>
       <SidebarGroupContent>
         <SidebarMenu>
           {items.map((item) => (

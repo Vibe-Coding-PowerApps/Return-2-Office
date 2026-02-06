@@ -107,8 +107,8 @@ export default function SchedulesPage() {
 
       setSchedules([...schedules, ...newSchedules])
       setUploadSuccess(
-        `Successfully uploaded ${newSchedules.length} schedules${
-          duplicateCount > 0 ? ` (${duplicateCount} duplicates skipped)` : ''
+        `Successfully imported ${newSchedules.length} schedule${newSchedules.length !== 1 ? 's' : ''}${
+          duplicateCount > 0 ? ` (${duplicateCount} duplicate${duplicateCount !== 1 ? 's' : ''} skipped)` : ''
         }`
       )
 
@@ -151,7 +151,7 @@ export default function SchedulesPage() {
           (s) => s.email.toLowerCase() === formData.email.toLowerCase()
         )
       ) {
-        setUploadError('This email already exists in the schedules')
+        setUploadError(`${formData.name} (${formData.email}) already exists in the schedules`)
         return
       }
 
@@ -169,7 +169,7 @@ export default function SchedulesPage() {
 
     setFormData({ name: '', email: '', schedule: {} })
     setIsAddDrawerOpen(false)
-    setTimeout(() => setUploadSuccess(null), 3000)
+    setTimeout(() => setUploadSuccess(null), 5000)
   }
 
   const handleEditRow = (scheduleId: string) => {
@@ -267,6 +267,7 @@ export default function SchedulesPage() {
             if (!open) {
               setEditingScheduleId(null)
               setFormData({ name: '', email: '', schedule: {} })
+              setUploadError(null)
             }
           }}>
             <SheetTrigger asChild>

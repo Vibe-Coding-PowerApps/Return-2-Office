@@ -25,6 +25,7 @@ import {
   IconChevronRight,
   IconChevronsLeft,
   IconChevronsRight,
+  IconDotsVertical,
   IconGripVertical,
 } from "@tabler/icons-react"
 import {
@@ -42,6 +43,13 @@ import {
 import { Badge } from '@/ui/badge'
 import { Button } from '@/ui/button'
 import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuSeparator,
+  DropdownMenuTrigger,
+} from '@/ui/dropdown-menu'
+import {
   Table,
   TableBody,
   TableCell,
@@ -56,6 +64,14 @@ type TeamMember = {
   email: string
   officeToday: boolean
   daysThisWeek: number
+}
+
+interface DataTableMembersProps {
+  data: TeamMember[]
+  onEditMember?: (member: TeamMember) => void
+  onCopyMember?: (member: TeamMember) => void
+  onFavoriteMember?: (member: TeamMember) => void
+  onDeleteMember?: (memberId: string) => void
 }
 
 // Drag handle component
@@ -105,7 +121,12 @@ function DragRow({ row }: DragRowProps) {
   )
 }
 
-const columns: ColumnDef<TeamMember>[] = [
+const createColumns = (
+  onEditMember?: (member: TeamMember) => void,
+  onCopyMember?: (member: TeamMember) => void,
+  onFavoriteMember?: (member: TeamMember) => void,
+  onDeleteMember?: (memberId: string) => void
+): ColumnDef<TeamMember>[] => [
   {
     id: "drag",
     header: () => null,
@@ -142,13 +163,50 @@ const columns: ColumnDef<TeamMember>[] = [
       <span className="font-medium">{row.original.daysThisWeek} days</span>
     ),
   },
+  {
+    id: "actions",
+    cell: ({ row }) => (
+      <DropdownMenu>
+        <DropdownMenuTrigger asChild>
+          <Button
+            variant="ghost"
+            className="data-[state=open]:bg-muted text-muted-foreground flex size-8"
+            size="icon"
+          >
+            <IconDotsVertical />
+            <span className="sr-only">Open menu</span>
+          </Button>
+        </DropdownMenuTrigger>
+        <DropdownMenuContent align="end" className="w-32">
+          <DropdownMenuItem onClick={() => onEditMember?.(row.original)}>
+            Edit
+          </DropdownMenuItem>
+          <DropdownMenuItem onClick={() => onCopyMember?.(row.original)}>
+            Make a copy
+          </DropdownMenuItem>
+          <DropdownMenuItem onClick={() => onFavoriteMember?.(row.original)}>
+            Favorite
+          </DropdownMenuItem>
+          <DropdownMenuSeparator />
+          <DropdownMenuItem 
+            className="text-red-600"
+            onClick={() => onDeleteMember?.(row.original.id)}
+          >
+            Delete
+          </DropdownMenuItem>
+        </DropdownMenuContent>
+      </DropdownMenu>
+    ),
+  },
 ]
 
 export function DataTableMembers({
   data: initialData,
-}: {
-  data: TeamMember[]
-}) {
+  onEditMember,
+  onCopyMember,
+  onFavoriteMember,
+  onDeleteMember,
+}: DataTableMembersProps) {
   const [data, setData] = React.useState(() => initialData)
   const [sorting, setSorting] = React.useState<SortingState>([])
   const [pagination, setPagination] = React.useState({
@@ -156,10 +214,20 @@ export function DataTableMembers({
     pageSize: 10,
   })
 
+  // Sync local state with prop changes
+  React.useEffect(() => {
+    setData(initialData)
+  }, [initialData])
+
   const sensors = useSensors(
     useSensor(MouseSensor, {}),
     useSensor(TouchSensor, {}),
     useSensor(KeyboardSensor, {})
+  )
+
+  const columns = React.useMemo(
+    () => createColumns(onEditMember, onCopyMember, onFavoriteMember, onDeleteMember),
+    [onEditMember, onCopyMember, onFavoriteMember, onDeleteMember]
   )
 
   const dataIds = React.useMemo<UniqueIdentifier[]>(

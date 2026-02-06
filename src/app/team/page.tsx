@@ -8,7 +8,6 @@ import { Sheet, SheetContent, SheetDescription, SheetHeader, SheetTitle, SheetTr
 import { Separator } from '@/ui/separator'
 import { IconUpload, IconPlus, IconFile, IconDownload, IconTrendingUp } from '@tabler/icons-react'
 import { Badge } from '@/ui/badge'
-import { toast } from 'sonner'
 import { DataTableMembers } from '@/components/data-table-members'
 
 type TeamMember = {
@@ -35,12 +34,31 @@ export default function TeamPage() {
   const [currentTeam, setCurrentTeam] = useState<Team | null>(null)
   const [isDragging, setIsDragging] = useState(false)
   const [isAddMemberDrawerOpen, setIsAddMemberDrawerOpen] = useState(false)
+  const [editingMember, setEditingMember] = useState<TeamMember | null>(null)
+  const [uploadError, setUploadError] = useState<string | null>(null)
+  const [uploadSuccess, setUploadSuccess] = useState<string | null>(null)
+  const [drawerError, setDrawerError] = useState<string | null>(null)
+  const [editDrawerError, setEditDrawerError] = useState<string | null>(null)
 
   // Manual add member form state
   const [formData, setFormData] = useState({
     memberName: '',
     memberEmail: '',
   })
+
+  // Edit member form state
+  const [editFormData, setEditFormData] = useState({
+    memberName: '',
+    memberEmail: '',
+  })
+
+  // Helper function to check if member email already exists
+  const isDuplicateEmail = (email: string, excludeId?: string) => {
+    if (!currentTeam?.members) return false
+    return currentTeam.members.some(member => 
+      member.email.toLowerCase() === email.toLowerCase() && member.id !== excludeId
+    )
+  }
 
   // Initialize with a default team (in real app, this would come from auth/context)
   const initializeTeam = () => {
@@ -87,7 +105,7 @@ export default function TeamPage() {
   const parseTeamCSV = (text: string): TeamMember[] => {
     const lines = text.trim().split('\n')
     if (lines.length < 2) {
-      toast.error('CSV must have headers and at least one row')
+      setUploadError('CSV must have headers and at least one row')
       return []
     }
 
@@ -118,7 +136,7 @@ export default function TeamPage() {
 
   const handleFileUpload = async (file: File) => {
     if (!file.name.endsWith('.csv')) {
-      toast.error('Please upload a CSV file')
+      setUploadError('Please upload a CSV file')
       return
     }
 
@@ -127,40 +145,73 @@ export default function TeamPage() {
       const members = parseTeamCSV(text)
 
       if (members.length === 0) {
-        toast.error('No valid members found in the CSV file')
+        setUploadError('No valid members found in the CSV file')
         return
       }
 
-      // Initialize team if not already done
-      if (!currentTeam) {
-        initializeTeam()
+      // Filter out duplicates from CSV
+      const existingEmails = currentTeam?.members?.map(m => m.email.toLowerCase()) || []
+      const uniqueMembers = members.filter(member => {
+        const isDuplicate = existingEmails.includes(member.email.toLowerCase())
+        return !isDuplicate
+      })
+
+      if (uniqueMembers.length === 0) {
+        setUploadError('All members from the CSV already exist in the team')
+        return
       }
 
-      // Update current team with new members
+      if (uniqueMembers.length < members.length) {
+        const duplicateCount = members.length - uniqueMembers.length
+        setUploadSuccess(
+          `Successfully imported ${uniqueMembers.length} member${uniqueMembers.length !== 1 ? 's' : ''} (${duplicateCount} duplicate${duplicateCount !== 1 ? 's' : ''} skipped)`
+        )
+      } else {
+        setUploadSuccess(`Successfully imported ${uniqueMembers.length} member${uniqueMembers.length !== 1 ? 's' : ''}`)
+      }
+
+      setUploadError(null)
+
+      // Update current team with new unique members (initialize if needed)
       setCurrentTeam(prev => {
-        if (!prev) return prev
+        if (!prev) {
+          return {
+            id: 'team_current',
+            name: 'My Team',
+            description: 'My team members',
+            manager: 'Team Lead Name',
+            totalMembers: uniqueMembers.length,
+            officeToday: 0,
+            officeThisWeek: 0,
+            members: uniqueMembers,
+          }
+        }
+
         return {
           ...prev,
-          members: [...(prev.members || []), ...members],
-          totalMembers: (prev.totalMembers || 0) + members.length,
+          members: [...(prev.members || []), ...uniqueMembers],
+          totalMembers: (prev.totalMembers || 0) + uniqueMembers.length,
         }
       })
 
-      toast.success(`Successfully imported ${members.length} member${members.length !== 1 ? 's' : ''}`)
+      // Clear success message after 5 seconds
+      setTimeout(() => setUploadSuccess(null), 5000)
     } catch (error) {
       console.error('Error parsing CSV:', error)
-      toast.error('Error parsing CSV file. Please check the format.')
+      setUploadError('Error parsing CSV file. Please check the format.')
     }
   }
 
   const handleAddMember = () => {
     if (!formData.memberName.trim() || !formData.memberEmail.trim()) {
-      toast.error('Member name and email are required')
+      setDrawerError('Member name and email are required')
       return
     }
 
-    if (!currentTeam) {
-      initializeTeam()
+    // Check for duplicate email
+    if (isDuplicateEmail(formData.memberEmail)) {
+      setDrawerError(`${formData.memberName} (${formData.memberEmail}) already exists in your team`)
+      return
     }
 
     const newMember: TeamMember = {
@@ -172,7 +223,21 @@ export default function TeamPage() {
     }
 
     setCurrentTeam(prev => {
-      if (!prev) return prev
+      // If no current team, initialize it with the new member
+      if (!prev) {
+        return {
+          id: 'team_current',
+          name: 'My Team',
+          description: 'My team members',
+          manager: 'Team Lead Name',
+          totalMembers: 1,
+          officeToday: 0,
+          officeThisWeek: 0,
+          members: [newMember],
+        }
+      }
+      
+      // Add member to existing team
       return {
         ...prev,
         members: [...(prev.members || []), newMember],
@@ -181,8 +246,101 @@ export default function TeamPage() {
     })
 
     setFormData({ memberName: '', memberEmail: '' })
+    setDrawerError(null)
     setIsAddMemberDrawerOpen(false)
-    toast.success('Member added successfully')
+    setUploadSuccess('Member added successfully')
+    setTimeout(() => setUploadSuccess(null), 5000)
+  }
+
+  const handleEditMember = (member: TeamMember) => {
+    setEditingMember(member)
+    setEditFormData({
+      memberName: member.name,
+      memberEmail: member.email,
+    })
+  }
+
+  const handleUpdateMember = () => {
+    if (!editFormData.memberName.trim() || !editFormData.memberEmail.trim()) {
+      setEditDrawerError('Member name and email are required')
+      return
+    }
+
+    if (!editingMember) return
+
+    // Check for duplicate email (excluding current member)
+    if (isDuplicateEmail(editFormData.memberEmail, editingMember.id)) {
+      setEditDrawerError('A team member with this email already exists')
+      return
+    }
+
+    setCurrentTeam(prev => {
+      if (!prev) return prev
+      return {
+        ...prev,
+        members: prev.members?.map(member => 
+          member.id === editingMember.id 
+            ? { ...member, name: editFormData.memberName, email: editFormData.memberEmail }
+            : member
+        ) || [],
+      }
+    })
+
+    setEditingMember(null)
+    setEditFormData({ memberName: '', memberEmail: '' })
+    setEditDrawerError(null)
+    setUploadSuccess('Member updated successfully')
+    setTimeout(() => setUploadSuccess(null), 5000)
+  }
+
+  const handleCopyMember = (member: TeamMember) => {
+    // Generate a unique email by appending timestamp
+    const timestamp = Date.now()
+    const emailParts = member.email.split('@')
+    const uniqueEmail = emailParts.length === 2 
+      ? `${emailParts[0]}_copy_${timestamp}@${emailParts[1]}`
+      : `${member.email}_copy_${timestamp}`
+
+    const newMember: TeamMember = {
+      id: `m_${timestamp}`,
+      name: `${member.name} (Copy)`,
+      email: uniqueEmail,
+      officeToday: member.officeToday,
+      daysThisWeek: member.daysThisWeek,
+    }
+
+    setCurrentTeam(prev => {
+      if (!prev) return prev
+      return {
+        ...prev,
+        members: [...(prev.members || []), newMember],
+        totalMembers: (prev.totalMembers || 0) + 1,
+      }
+    })
+
+    setUploadSuccess('Member copied successfully')
+    setTimeout(() => setUploadSuccess(null), 5000)
+  }
+
+  const handleFavoriteMember = (member: TeamMember) => {
+    setUploadSuccess(`${member.name} added to favorites`)
+    setTimeout(() => setUploadSuccess(null), 5000)
+  }
+
+  const handleDeleteMember = (memberId: string) => {
+    setCurrentTeam(prev => {
+      if (!prev) return prev
+      const memberToDelete = prev.members?.find(m => m.id === memberId)
+      return {
+        ...prev,
+        members: prev.members?.filter(member => member.id !== memberId) || [],
+        totalMembers: Math.max(0, (prev.totalMembers || 0) - 1),
+      }
+    })
+
+    const memberToDelete = currentTeam?.members?.find(m => m.id === memberId)
+    setUploadSuccess(`${memberToDelete?.name || 'Member'} deleted successfully`)
+    setTimeout(() => setUploadSuccess(null), 5000)
   }
 
   const downloadTemplate = () => {
@@ -218,7 +376,10 @@ Karen Rodriguez,karen.rodriguez@company.com`
         </div>
         <div className="flex gap-2">
           {/* Add Member Button */}
-          <Sheet open={isAddMemberDrawerOpen} onOpenChange={setIsAddMemberDrawerOpen}>
+          <Sheet open={isAddMemberDrawerOpen} onOpenChange={(open) => {
+            setIsAddMemberDrawerOpen(open)
+            if (!open) setDrawerError(null)
+          }}>
             <SheetTrigger asChild>
               <Button className="gap-2">
                 <IconPlus className="h-4 w-4" />
@@ -233,6 +394,12 @@ Karen Rodriguez,karen.rodriguez@company.com`
                 </SheetDescription>
               </SheetHeader>
               <div className="mt-6 space-y-6">
+                {drawerError && (
+                  <div className="rounded-lg bg-destructive/10 border border-destructive/30 p-4 text-sm text-destructive">
+                    {drawerError}
+                  </div>
+                )}
+
                 <div className="space-y-2">
                   <label className="text-sm font-medium">Member Name *</label>
                   <Input
@@ -255,7 +422,13 @@ Karen Rodriguez,karen.rodriguez@company.com`
                   />
                 </div>
 
-                <Button onClick={handleAddMember} className="w-full">
+                <Button 
+                  onClick={(e) => {
+                    e.preventDefault()
+                    handleAddMember()
+                  }} 
+                  className="w-full"
+                >
                   Add Member
                 </Button>
               </div>
@@ -367,6 +540,23 @@ Karen Rodriguez,karen.rodriguez@company.com`
         </Card>
       </div>
 
+      {/* Alerts */}
+      {uploadError && (
+        <div className="px-4 lg:px-6">
+          <div className="rounded-lg bg-destructive/10 border border-destructive/30 p-4 text-sm text-destructive">
+            {uploadError}
+          </div>
+        </div>
+      )}
+
+      {uploadSuccess && (
+        <div className="px-4 lg:px-6">
+          <div className="rounded-lg bg-green-100 border border-green-300 dark:bg-green-900/20 dark:border-green-800 p-4 text-sm text-green-800 dark:text-green-200">
+            {uploadSuccess}
+          </div>
+        </div>
+      )}
+
       {/* Main Content */}
       {!currentTeam ? (
         // Empty State - Initialize Team
@@ -447,9 +637,65 @@ Karen Rodriguez,karen.rodriguez@company.com`
         <div className="px-4 lg:px-6 flex-1 flex flex-col min-h-0">
           {/* Team Members Table */}
           {currentTeam.members && currentTeam.members.length > 0 ? (
-            <DataTableMembers
-              data={currentTeam.members}
-            />
+            <>
+              <DataTableMembers
+                data={currentTeam.members}
+                onEditMember={handleEditMember}
+                onCopyMember={handleCopyMember}
+                onFavoriteMember={handleFavoriteMember}
+                onDeleteMember={handleDeleteMember}
+              />
+              
+              {/* Edit Member Sheet */}
+              <Sheet open={!!editingMember} onOpenChange={(open) => {
+                if (!open) {
+                  setEditingMember(null)
+                  setEditDrawerError(null)
+                }
+              }}>
+                <SheetContent>
+                  <SheetHeader>
+                    <SheetTitle>Edit Team Member</SheetTitle>
+                    <SheetDescription>
+                      Update member information
+                    </SheetDescription>
+                  </SheetHeader>
+                  <div className="mt-6 space-y-6">
+                    {editDrawerError && (
+                      <div className="rounded-lg bg-destructive/10 border border-destructive/30 p-4 text-sm text-destructive">
+                        {editDrawerError}
+                      </div>
+                    )}
+
+                    <div className="space-y-2">
+                      <label className="text-sm font-medium">Member Name *</label>
+                      <Input
+                        placeholder="John Smith"
+                        value={editFormData.memberName}
+                        onChange={(e) =>
+                          setEditFormData({ ...editFormData, memberName: e.target.value })
+                        }
+                      />
+                    </div>
+
+                    <div className="space-y-2">
+                      <label className="text-sm font-medium">Member Email *</label>
+                      <Input
+                        placeholder="john.smith@company.com"
+                        value={editFormData.memberEmail}
+                        onChange={(e) =>
+                          setEditFormData({ ...editFormData, memberEmail: e.target.value })
+                        }
+                      />
+                    </div>
+
+                    <Button onClick={handleUpdateMember} className="w-full">
+                      Update Member
+                    </Button>
+                  </div>
+                </SheetContent>
+              </Sheet>
+            </>
           ) : (
             <Card>
               <CardContent className="pt-12 pb-12">
