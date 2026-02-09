@@ -12,7 +12,7 @@ import {
   IconListDetails,
   IconUsers,
 } from "@tabler/icons-react"
-import { LayoutDashboard } from "lucide-react"
+import { LayoutDashboard, LogIn } from "lucide-react"
 
 import { NavDocuments } from '@/components/nav-documents'
 import { NavMain } from '@/components/nav-main'
@@ -132,9 +132,9 @@ export function AppSidebar({ userData, ...props }: React.ComponentProps<typeof S
               asChild
             >
               <Link to="/app/dashboard">
-                <IconBuildingSkyscraper className="!size-5" />
-                <span className="text-base font-semibold">Return to Office</span>
-              </Link>
+                  <LogIn className="!size-5" />
+                  <span className="text-base font-semibold">Return to Office</span>
+                </Link>
             </SidebarMenuButton>
           </SidebarMenuItem>
         </SidebarMenu>
