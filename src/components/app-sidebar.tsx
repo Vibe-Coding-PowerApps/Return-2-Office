@@ -4,7 +4,6 @@ import * as React from "react"
 import { Link } from 'react-router-dom'
 import {
   IconCamera,
-  IconChartBar,
   IconDatabase,
   IconFileAi,
   IconFileDescription,
@@ -13,6 +12,7 @@ import {
   IconListDetails,
   IconUsers,
 } from "@tabler/icons-react"
+import { LayoutDashboard } from "lucide-react"
 
 import { NavDocuments } from '@/components/nav-documents'
 import { NavMain } from '@/components/nav-main'
@@ -38,7 +38,7 @@ const data = {
     {
       title: "Dashboard",
       url: "/app/dashboard",
-      icon: IconChartBar,
+      icon: LayoutDashboard,
     },
     {
       title: "Workplace Utilization",
@@ -125,8 +125,8 @@ export function AppSidebar({ userData, ...props }: React.ComponentProps<typeof S
   
   return (
     <Sidebar collapsible="offcanvas" {...props}>
-      <SidebarHeader>
-        <SidebarMenu className="px-2">
+      <SidebarHeader className="mb-6">
+        <SidebarMenu>
           <SidebarMenuItem>
             <SidebarMenuButton
               asChild

@@ -34,17 +34,17 @@ export function NavDocuments({
   }
 
   return (
-    <SidebarGroup>
+    <SidebarGroup className="relative flex w-full min-w-0 flex-col p-0">
       <SidebarGroupLabel>Workplace Hub</SidebarGroupLabel>
-      <SidebarGroupContent className="flex flex-col gap-2 px-2">
-        <SidebarMenu>
+      <SidebarGroupContent className="flex flex-col gap-2">
+        <SidebarMenu className="pl-2">
           {items.map((item) => (
             <SidebarMenuItem key={item.name}>
               <SidebarMenuButton
                 tooltip={item.name}
                 asChild
                 isActive={isActive(item.url)}
-                className={isActive(item.url) ? "bg-white dark:bg-neutral-200 text-black dark:text-black hover:bg-white/90 dark:hover:bg-neutral-200/90 hover:text-black dark:hover:text-black" : ""}
+                className={(isActive(item.url) ? "bg-white dark:bg-neutral-200 text-black dark:text-black hover:bg-white/90 dark:hover:bg-neutral-200/90 hover:text-black dark:hover:text-black " : "") + "w-full"}
               >
                 <Link to={item.url}>
                   {item.icon && <item.icon />}

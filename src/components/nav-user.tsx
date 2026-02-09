@@ -70,11 +70,8 @@ export function NavUser({
                 <AvatarImage src={user.avatar} alt={user.name} />
                 <AvatarFallback className="rounded-lg">{initials}</AvatarFallback>
               </Avatar>
-              <div className="grid flex-1 text-left text-sm leading-tight">
+              <div className="flex items-center flex-1 text-left text-sm leading-tight min-w-[8.5rem]">
                 <span className="truncate font-medium">{user.name}</span>
-                <span className="text-muted-foreground truncate text-xs">
-                  {user.email}
-                </span>
               </div>
               <IconDotsVertical className="ml-auto size-4" />
             </SidebarMenuButton>

@@ -28,7 +28,7 @@ function AppContent({ userData }: { userData: any }) {
       }
     >
       <AppSidebar variant="inset" userData={userData} />
-      <SidebarInset>
+      <SidebarInset className="md:pl-[--sidebar-width]">
         <SiteHeader />
         <Routes>
           <Route path="/" element={<Navigate to="/app/dashboard" replace />} />
