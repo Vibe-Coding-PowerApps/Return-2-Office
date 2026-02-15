@@ -150,8 +150,8 @@ export function ChartAreaInteractive() {
     }
   }, [isMobile])
 
-  const filteredData = chartData.filter((item) => {
-    const date = new Date(item.date)
+  // Build filtered data with numeric timestamps and compute fixed domain
+  const { filteredData, domain } = React.useMemo(() => {
     const referenceDate = new Date("2024-06-30")
     let daysToSubtract = 89 // For 90 days inclusive (last 90 days)
     if (timeRange === "30d") {
@@ -159,10 +159,20 @@ export function ChartAreaInteractive() {
     } else if (timeRange === "7d") {
       daysToSubtract = 6 // For 7 days inclusive (last 7 days)
     }
+
     const startDate = new Date(referenceDate)
     startDate.setDate(startDate.getDate() - daysToSubtract)
-    return date >= startDate
-  })
+
+    const data = chartData
+      .filter((item) => new Date(item.date) >= startDate)
+      .map((item) => ({ ...item, time: new Date(item.date).getTime() }))
+
+    const times = data.map(d => d.time)
+    const dataMin = times.length ? Math.min(...times) : new Date(chartData[0].date).getTime()
+    const dataMax = times.length ? Math.max(...times) : new Date(chartData[chartData.length - 1].date).getTime()
+
+    return { filteredData: data, domain: [dataMin, dataMax] as [number, number] }
+  }, [timeRange])
 
   return (
     <Card className="@container/card dark:bg-zinc-900/50">
@@ -248,13 +258,16 @@ export function ChartAreaInteractive() {
             </defs>
             <CartesianGrid vertical={false} />
             <XAxis
-              dataKey="date"
+              dataKey="time"
+              type="number"
+              scale="time"
+              domain={domain}
               tickLine={false}
               axisLine={false}
               tickMargin={8}
               minTickGap={32}
               tickFormatter={(value) => {
-                const date = new Date(value)
+                const date = new Date(Number(value))
                 return date.toLocaleDateString("en-US", {
                   month: "short",
                   day: "numeric",
@@ -266,7 +279,8 @@ export function ChartAreaInteractive() {
               content={
                 <ChartTooltipContent
                   labelFormatter={(value) => {
-                    return new Date(value).toLocaleDateString("en-US", {
+                    const date = typeof value === 'number' ? new Date(value) : new Date(String(value))
+                    return date.toLocaleDateString("en-US", {
                       month: "short",
                       day: "numeric",
                     })
