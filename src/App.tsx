@@ -1,6 +1,5 @@
 import { useEffect, useState } from 'react'
 import { BrowserRouter, Routes, Route, Navigate } from 'react-router-dom'
-import { getContext } from '@microsoft/power-apps/app'
 import { AppSidebar } from '@/components/app-sidebar'
 import { SiteHeader } from '@/components/site-header'
 import { Toaster } from '@/ui/sonner'
@@ -55,6 +54,7 @@ function App() {
       try {
         // Only try to load context in Power Apps environment
         if (window.location.host.includes('powerapps.com')) {
+          const { getContext } = await import('@microsoft/power-apps/app')
           const ctx = await getContext()
 
           // Get user's basic information
